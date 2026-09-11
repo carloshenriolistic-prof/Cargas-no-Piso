@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CARGAS NO PISO — Painel CD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151a;
+    --panel:#1c222b;
+    --panel-header:#0d1015;
+    --band:#e3b23c;
+    --band-text:#12151a;
+    --text:#eef1f5;
+    --text-dim:#8f99a8;
+    --line:#2b323c;
+    --ok-bg:#204d3a;
+    --ok-text:#7fe0ab;
+    --warn-bg:#4d3a20;
+    --warn-text:#f2b565;
+    --danger:#e2685f;
+    --row-alt:#20262f;
+    --input-bg:#151a20;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+    font-variant-numeric:tabular-nums;
+  }
+  h1,h2,h3,.label-font{font-family:'Oswald',sans-serif; letter-spacing:.02em;}
+
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:
+      radial-gradient(circle at 20% 20%, #1b222c 0%, transparent 55%),
+      radial-gradient(circle at 80% 80%, #201a12 0%, transparent 55%),
+      var(--bg);
+  }
+  .login-card{
+    width:100%;
+    max-width:420px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  .login-band{
+    background:var(--band);
+    color:var(--band-text);
+    padding:20px 28px;
+  }
+  .login-band h1{margin:0;font-size:1.5rem;font-weight:700;}
+  .login-band p{margin:4px 0 0;font-size:.8rem;font-weight:500;opacity:.75;}
+  .login-body{padding:28px;}
+  .field{margin-bottom:18px;}
+  .field label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:6px;font-weight:600;}
+  .field select, .field input{
+    width:100%;
+    background:var(--input-bg);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:3px;
+    font-size:.95rem;
+    font-family:'Inter',sans-serif;
+  }
+  .field select:focus, .field input:focus{outline:2px solid var(--band); outline-offset:0;}
+  #login-error{color:var(--danger); font-size:.82rem; margin:-8px 0 14px; min-height:1em;}
+  .btn{
+    cursor:pointer;
+    border:none;
+    border-radius:3px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    letter-spacing:.03em;
+    padding:10px 18px;
+    font-size:.85rem;
+  }
+  .btn-primary{background:var(--band); color:var(--band-text); width:100%; padding:12px;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-ghost{background:transparent; border:1px solid var(--line); color:var(--text);}
+  .btn-ghost:hover{border-color:var(--text-dim);}
+  .btn-ok{background:var(--ok-text); color:#0d2318;}
+  .btn-danger{background:transparent; color:var(--danger); border:1px solid var(--danger); padding:5px 9px; font-size:.72rem;}
+  .btn-sm{padding:5px 10px; font-size:.72rem;}
+  .btn:disabled{opacity:.35; cursor:not-allowed;}
+  .hint{font-size:.72rem; color:var(--text-dim); margin-top:16px; line-height:1.5;}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none;}
+  #topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px;
+    background:var(--panel-header);
+    border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:50;
+    flex-wrap:wrap; gap:10px;
+  }
+  #topbar .brand{display:flex; align-items:center; gap:10px;}
+  #topbar .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--band);}
+  #topbar h1{font-size:1.05rem; margin:0;}
+  #topbar .who{font-size:.78rem; color:var(--text-dim);}
+  #topbar .who b{color:var(--text); font-weight:600;}
+  #topbar .actions{display:flex; align-items:center; gap:10px;}
+  .tag{
+    font-size:.68rem; text-transform:uppercase; letter-spacing:.06em;
+    padding:3px 8px; border-radius:2px; font-weight:700;
+    background:var(--input-bg); border:1px solid var(--line); color:var(--text-dim);
+  }
+
+  main{max-width:1400px; margin:0 auto; padding:24px 28px 80px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    margin-bottom:28px;
+    overflow:hidden;
+  }
+  .panel-header{
+    background:var(--panel-header);
+    padding:14px 20px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    border-bottom:1px solid var(--line);
+  }
+  .panel-header .title-block{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+  .panel-header h2{font-size:1.1rem; margin:0; color:var(--band);}
+  .panel-header .sub{font-size:.75rem; color:var(--text-dim);}
+  .stat-row{display:flex; gap:22px; flex-wrap:wrap;}
+  .stat{text-align:right;}
+  .stat .n{font-family:'Oswald',sans-serif; font-size:1.15rem; font-weight:600;}
+  .stat .l{font-size:.62rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim);}
+
+  table{width:100%; border-collapse:collapse; font-size:.85rem;}
+  thead th{
+    background:var(--band); color:var(--band-text);
+    text-transform:uppercase; font-size:.68rem; letter-spacing:.05em;
+    padding:9px 10px; text-align:left; white-space:nowrap; font-weight:700;
+  }
+  tbody td{padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tbody tr:nth-child(even){background:var(--row-alt);}
+  tbody tr:hover{background:#262d38;}
+  tfoot td{
+    background:var(--panel-header); font-weight:700; padding:10px;
+    border-top:2px solid var(--band); font-family:'Oswald',sans-serif;
+  }
+  td input[type=text], td input[type=number], td input[type=time], td select{
+    width:100%; background:var(--input-bg); border:1px solid var(--line); color:var(--text);
+    padding:5px 6px; border-radius:2px; font-size:.82rem; font-family:'Inter',sans-serif;
+  }
+  td input:disabled, td select:disabled{background:transparent; border-color:transparent; color:var(--text); opacity:.9; -webkit-appearance:none;}
+  .status-pill{
+    display:inline-block; padding:4px 9px; border-radius:2px; font-size:.7rem;
+    font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+  }
+  .status-etq{background:var(--ok-bg); color:var(--ok-text);}
+  .status-pend{background:var(--warn-bg); color:var(--warn-text);}
+  .empty-row td{text-align:center; color:var(--text-dim); padding:22px; font-style:italic;}
+  .table-scroll{overflow-x:auto;}
+  .panel-footer-actions{padding:12px 20px; display:flex; gap:10px; border-top:1px solid var(--line); background:var(--panel-header);}
+
+  .summary-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1px; background:var(--line);}
+  .summary-cards .card{background:var(--panel); padding:14px 16px;}
+  .summary-cards .card .n{font-family:'Oswald',sans-serif; font-size:1.3rem; font-weight:600; color:var(--band);}
+  .summary-cards .card .l{font-size:.68rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:.05em; margin-top:2px;}
+  .summary-cards .card .summary-input{
+    width:100%; background:transparent; border:none; border-bottom:1px solid var(--line);
+    color:var(--band); font-family:'Oswald',sans-serif; font-size:1.3rem; font-weight:600; padding:0 0 4px;
+  }
+  .summary-cards .card .summary-input:disabled{color:var(--text); opacity:.7;}
+  .summary-cards .card .summary-input:focus{outline:none; border-color:var(--band);}
+
+  [contenteditable="true"]{outline-offset:2px;}
+  [contenteditable="true"]:hover{outline:1px dashed var(--text-dim);}
+  [contenteditable="true"]:focus{outline:2px solid var(--band);}
+
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.6);
+    align-items:center; justify-content:center; z-index:200; padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-box{
+    background:var(--panel); border:1px solid var(--line); border-radius:4px;
+    width:100%; max-width:720px; overflow:hidden;
+  }
+  .modal-box .login-band{padding:16px 20px;}
+  .modal-box .login-band h1{font-size:1.05rem;}
+  .modal-body{padding:20px;}
+  .modal-body textarea{
+    width:100%; min-height:180px; background:var(--input-bg); border:1px solid var(--line);
+    color:var(--text); padding:10px; border-radius:3px; font-family:monospace; font-size:.8rem; resize:vertical;
+  }
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:14px;}
+
+  @media (max-width:720px){
+    main{padding:16px;}
+    .panel-header{flex-direction:column; align-items:flex-start;}
+    table{font-size:.75rem;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-band">
+      <h1>CARGAS NO PISO</h1>
+      <p>Setores: Recebimento · Distribuição</p>
+    </div>
+    <div class="login-body">
+      <div class="field">
+        <label for="in-nome">Usuário</label>
+        <input id="in-nome" type="text" placeholder="Seu nome" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="in-senha">Senha</label>
+        <input id="in-senha" type="password" placeholder="Senha de acesso" autocomplete="off">
+      </div>
+      <div id="login-error"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
+      <p class="hint">O acesso é liberado por perfil (senha): Administrador, Encarregado, Conferente ou Geral. Peça a senha do seu perfil ao responsável pelo CD.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <div id="topbar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <h1>CARGAS NO PISO</h1>
+        <div class="who">Olá, <b id="who-name"></b> · Recebimento · Distribuição · <span class="tag" id="who-role"></span></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost btn-sm" id="demo-btn" onclick="loadDemo()" style="display:none;">Carregar exemplo</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- PANEL 1: CARGAS NO PISO -->
+    <section class="panel" id="panel-piso">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2 contenteditable="false" id="titulo-piso">CARGAS NO PISO</h2>
+          <span class="sub" id="data-piso"></span>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="st-total-cargas">0</div><div class="l">Total de cargas</div></div>
+          <div class="stat"><div class="n" id="st-cargas-etq">0</div><div class="l">Etiquetadas</div></div>
+          <div class="stat"><div class="n" id="st-vol-etq">0</div><div class="l">Volumes (etiq.)</div></div>
+          <div class="stat"><div class="n" id="st-sku-etq">0</div><div class="l">SKU (etiq.)</div></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Produtivo</th><th>Doca</th><th>Carga</th><th>Fornecedor</th><th>Liberação</th>
+              <th>D-1</th><th>Volume</th><th>SKU</th><th>Departamento</th><th>Status</th><th>Obs.</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-piso"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6">VOLUME TOTAL</td>
+              <td id="ft-vol-total">0</td>
+              <td id="ft-sku-total">0</td>
+              <td colspan="4"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="panel-footer-actions" id="piso-actions" style="display:none;">
+        <button class="btn btn-ghost btn-sm" onclick="addPisoRow()">+ Adicionar carga</button>
+        <button class="btn btn-ghost btn-sm" onclick="openImportModal()">Colar da planilha (Excel)</button>
+      </div>
+    </section>
+
+    <!-- PANEL 2: FILA DE DISTRIBUIÇÃO -->
+    <section class="panel" id="panel-fila">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2>FILA DE DISTRIBUIÇÃO</h2>
+          <span class="sub">Cargas etiquetadas, prontas para distribuir</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="st-fila-count">0</div><div class="l">Aguardando</div></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Produtivo</th><th>Doca</th><th>Carga</th><th>Fornecedor</th><th>Liberação</th>
+              <th>D-1</th><th>Volume</th><th>SKU</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-fila"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PANEL 3: DISTRIBUIÇÃO T2 -->
+    <section class="panel" id="panel-dist">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2 contenteditable="false" id="titulo-dist">DISTRIBUIÇÃO T2</h2>
+          <span class="sub" id="data-dist"></span>
+        </div>
+      </div>
+      <div class="summary-cards">
+        <div class="card">
+          <input type="number" id="sm-produtivos" class="summary-input" min="0" value="0" oninput="updateExtra('qtdProdutivos', this.value)">
+          <div class="l">Qtd. produtivos (manual)</div>
+        </div>
+        <div class="card"><div class="n" id="sm-cargas">0</div><div class="l">Qtd. cargas distribuídas</div></div>
+        <div class="card"><div class="n" id="sm-hh">0</div><div class="l">H/H (volume ÷ 7h ÷ produtivos)</div></div>
+        <div class="card">
+          <input type="number" id="sm-full" class="summary-input" min="0" value="0" oninput="updateExtra('estocadoFull', this.value)">
+          <div class="l">Estocado full (manual)</div>
+        </div>
+        <div class="card">
+          <input type="number" id="sm-mix" class="summary-input" min="0" value="0" oninput="updateExtra('estocadoMix', this.value)">
+          <div class="l">Estocado mix / fracionado (manual)</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Etiquetagem</th><th>Doca</th><th>Carga</th><th>Descrição</th><th>Liberação</th>
+              <th>D-1</th><th>Volume</th><th>SKU</th><th>Hora dist.</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-dist"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6">DISTRIBUIÇÃO TOTAL T2</td>
+              <td id="ft-dist-vol">0</td>
+              <td id="ft-dist-sku">0</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===================== MODAL: IMPORTAR PLANILHA ===================== -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-box">
+    <div class="login-band">
+      <h1>Colar cargas da planilha</h1>
+      <p>Cole as linhas copiadas do Excel (com as colunas: Produtivo, Doca, Carga, Fornecedor, Liberação, D-1, Volume, SKU, Departamento, Status, Obs.)</p>
+    </div>
+    <div class="modal-body">
+      <textarea id="import-textarea" placeholder="Cole aqui o intervalo copiado do Excel..."></textarea>
+      <p class="hint">Isso substitui todas as cargas do painel "Cargas no piso" pelas linhas coladas. Se a primeira linha for o cabeçalho (PRODUTIVO, DOCA...), ela é ignorada automaticamente.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-sm" onclick="closeImportModal()">Cancelar</button>
+        <button class="btn btn-primary" style="width:auto;" onclick="importPisoFromPaste()">Importar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== CONFIG ===================== */
+const ROLE_PASSWORDS = {
+  'AdministradorCD30SECOS': 'admin',
+  'EncarCD30SECOS': 'encarregado',
+  'ConfCD30SECOS': 'conferente',
+  'OpCD30SECOS': 'geral'
+};
+const ROLE_LABELS = { admin:'Administrador', encarregado:'Encarregado', conferente:'Conferente', geral:'Geral' };
+
+/* ===================== ESTADO (em memória) ===================== */
+/* Observação: os dados abaixo vivem apenas na memória do navegador enquanto a página
+   estiver aberta — não há armazenamento local nem backend ainda. Ao publicar no
+   GitHub Pages, se quiser que os dados sobrevivam a um F5 ou sejam vistos por
+   todo mundo, o próximo passo natural é ligar isso ao Firebase (Firestore),
+   já que vocês vão usar Firebase Authentication mesmo. */
+
+let currentUser = null; // {nome, role, setor}
+
+let pisoData = [
+  {produtivo:'', doca:'', carga:'446856', fornecedor:'BASTON ID:8834', liberacao:'10/09/2026', d1:0, volume:118, sku:2, departamento:'NÃO ALIMENTOS - HLP', status:'CARGA ETIQUETADA', obs:''},
+  {produtivo:'MICHELY', doca:'', carga:'446863', fornecedor:'BEBIDAS GRASSI ID:8883/8882', liberacao:'10/09/2026', d1:0, volume:4485, sku:14, departamento:'', status:'CARGA ETIQUETADA', obs:'"CROSS & ESTOCADO"'},
+  {produtivo:'', doca:'117', carga:'446702', fornecedor:'1º MK ID:7802', liberacao:'10/09/2026', d1:0, volume:38, sku:1, departamento:'', status:'PENDENTE DE ETIQUETAGEM', obs:'CROSS & ESTOCADO - Retrabalho'}
+];
+
+let distData = []; // cargas já distribuídas (painel 3)
+let distExtras = { qtdProdutivos: 0, estocadoFull: 0, estocadoMix: 0 }; // valores manuais, avulsos da grade
+
+const DEMO_DIST = [
+  {etiquetagem:'', doca:'', carga:'446886', descricao:'VINICOLA ID:8594', liberacao:'10/09/2026', d1:0, volume:2064, sku:9, horaDist:'19:10'},
+  {etiquetagem:'', doca:'', carga:'446523', descricao:'RUAH ALIMENTOS ID:8292', liberacao:'10/09/2026', d1:0, volume:2079, sku:18, horaDist:'19:15'},
+  {etiquetagem:'MICHELY', doca:'12', carga:'447244', descricao:'ITALAC ID:9001', liberacao:'10/09/2026', d1:0, volume:1984, sku:13, horaDist:'19:20'},
+  {etiquetagem:'', doca:'', carga:'446958', descricao:'PANDURATA ID:9007', liberacao:'10/09/2026', d1:0, volume:430, sku:3, horaDist:'19:25'},
+  {etiquetagem:'NATALY', doca:'8', carga:'447463', descricao:'OPALMA :9078', liberacao:'10/09/2026', d1:0, volume:357, sku:2, horaDist:'19:30'},
+  {etiquetagem:'', doca:'', carga:'446605', descricao:'DIPA ID:9057', liberacao:'10/09/2026', d1:0, volume:183, sku:13, horaDist:'19:35'},
+  {etiquetagem:'MICHELY', doca:'', carga:'445950', descricao:'LEÃO ID:9130', liberacao:'09/09/2026', d1:-1, volume:1491, sku:36, horaDist:'19:40'}
+];
+const DEMO_EXTRAS = { qtdProdutivos: 7, estocadoFull: 175, estocadoMix: 8588 };
+
+/* ===================== LOGIN / LOGOUT ===================== */
+function doLogin(){
+  const nome = document.getElementById('in-nome').value.trim();
+  const senha = document.getElementById('in-senha').value;
+  const errBox = document.getElementById('login-error');
+
+  if(!nome){ errBox.textContent = 'Digite seu nome.'; return; }
+  const role = ROLE_PASSWORDS[senha];
+  if(!role){ errBox.textContent = 'Senha inválida.'; return; }
+
+  errBox.textContent = '';
+  currentUser = { nome, role };
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('who-name').textContent = nome;
+  document.getElementById('who-role').textContent = ROLE_LABELS[role];
+
+  document.getElementById('titulo-piso').setAttribute('contenteditable', role==='admin' ? 'true' : 'false');
+  document.getElementById('titulo-dist').setAttribute('contenteditable', role==='admin' ? 'true' : 'false');
+  document.getElementById('piso-actions').style.display = role==='admin' ? 'flex' : 'none';
+  document.getElementById('demo-btn').style.display = role==='admin' ? 'inline-block' : 'none';
+
+  applySectorVisibility();
+  renderAll();
+}
+
+function logout(){
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('in-senha').value = '';
+}
+
+function applySectorVisibility(){
+  // Recebimento e Distribuição funcionam em conjunto, sem separação:
+  // todo mundo que loga vê os três painéis, o que muda é só o que cada perfil pode editar.
+  document.getElementById('panel-piso').style.display = 'block';
+  document.getElementById('panel-fila').style.display = 'block';
+  document.getElementById('panel-dist').style.display = 'block';
+}
+
+function loadDemo(){
+  if(currentUser.role !== 'admin') return;
+  distData = JSON.parse(JSON.stringify(DEMO_DIST));
+  distExtras = { ...DEMO_EXTRAS };
+  renderDist();
+}
+
+/* ===================== HELPERS ===================== */
+function fmtInt(n){ return Math.round(n).toLocaleString('pt-BR'); }
+function todayLabel(){
+  const d = new Date();
+  const dia = String(d.getDate()).padStart(2,'0');
+  const mes = String(d.getMonth()+1).padStart(2,'0');
+  const ano = d.getFullYear();
+  const extenso = d.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  return { curto: `${dia}/${mes}/${ano}`, extenso };
+}
+function nowTime(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+
+/* ===================== RENDER: PAINEL 1 - CARGAS NO PISO ===================== */
+function renderPiso(){
+  const { role } = currentUser;
+  const canEditAll = role === 'admin';
+  const canMarkStatus = role === 'admin' || role === 'encarregado';
+
+  const tbody = document.getElementById('tbody-piso');
+  tbody.innerHTML = '';
+
+  if(pisoData.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="12">Nenhuma carga no piso.</td></tr>';
+  }
+
+  pisoData.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    const isEtq = row.status === 'CARGA ETIQUETADA';
+    tr.innerHTML = `
+      <td><input type="text" value="${escapeHtml(row.produtivo)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'produtivo',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.doca)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'doca',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.carga)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'carga',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.fornecedor)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'fornecedor',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.liberacao)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'liberacao',this.value)"></td>
+      <td><input type="number" value="${row.d1}" ${canEditAll?'':'disabled'} style="width:56px" onchange="updatePiso(${i},'d1',Number(this.value))"></td>
+      <td><input type="number" value="${row.volume}" ${canEditAll?'':'disabled'} style="width:76px" onchange="updatePiso(${i},'volume',Number(this.value))"></td>
+      <td><input type="number" value="${row.sku}" ${canEditAll?'':'disabled'} style="width:56px" onchange="updatePiso(${i},'sku',Number(this.value))"></td>
+      <td><input type="text" value="${escapeHtml(row.departamento)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'departamento',this.value)"></td>
+      <td>
+        <select ${canMarkStatus?'':'disabled'} onchange="updatePiso(${i},'status',this.value)">
+          <option value="CARGA ETIQUETADA" ${isEtq?'selected':''}>Carga etiquetada</option>
+          <option value="PENDENTE DE ETIQUETAGEM" ${!isEtq?'selected':''}>Pendente de etiquetagem</option>
+        </select>
+      </td>
+      <td><input type="text" value="${escapeHtml(row.obs)}" ${canEditAll?'':'disabled'} onchange="updatePiso(${i},'obs',this.value)"></td>
+      <td>${canEditAll ? `<button class="btn btn-danger" onclick="removePisoRow(${i})">Remover</button>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const totalCargas = pisoData.length;
+  const etqRows = pisoData.filter(r => r.status === 'CARGA ETIQUETADA');
+  const volEtq = etqRows.reduce((s,r)=>s+Number(r.volume||0),0);
+  const skuEtq = etqRows.reduce((s,r)=>s+Number(r.sku||0),0);
+  const volTotal = pisoData.reduce((s,r)=>s+Number(r.volume||0),0);
+  const skuTotal = pisoData.reduce((s,r)=>s+Number(r.sku||0),0);
+
+  document.getElementById('st-total-cargas').textContent = totalCargas;
+  document.getElementById('st-cargas-etq').textContent = etqRows.length;
+  document.getElementById('st-vol-etq').textContent = fmtInt(volEtq);
+  document.getElementById('st-sku-etq').textContent = skuEtq;
+  document.getElementById('ft-vol-total').textContent = fmtInt(volTotal);
+  document.getElementById('ft-sku-total').textContent = skuTotal;
+
+  const { curto, extenso } = todayLabel();
+  document.getElementById('data-piso').textContent = `${curto} · ${extenso}`;
+}
+
+function updatePiso(i, field, value){
+  pisoData[i][field] = value;
+  renderAll();
+}
+function removePisoRow(i){
+  if(!confirm('Remover esta carga do piso?')) return;
+  pisoData.splice(i,1);
+  renderAll();
+}
+function addPisoRow(){
+  pisoData.push({produtivo:'', doca:'', carga:'', fornecedor:'', liberacao: todayLabel().curto, d1:0, volume:0, sku:0, departamento:'', status:'PENDENTE DE ETIQUETAGEM', obs:''});
+  renderAll();
+}
+
+/* ===================== RENDER: PAINEL 2 - FILA DE DISTRIBUIÇÃO ===================== */
+function renderFila(){
+  const canDistribuir = ['admin','encarregado','conferente'].includes(currentUser.role);
+  const tbody = document.getElementById('tbody-fila');
+  tbody.innerHTML = '';
+
+  const fila = pisoData.map((r,i)=>({...r, _idx:i})).filter(r => r.status === 'CARGA ETIQUETADA');
+
+  if(fila.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Nenhuma carga aguardando distribuição.</td></tr>';
+  }
+
+  fila.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.produtivo)}</td>
+      <td>${escapeHtml(row.doca)}</td>
+      <td>${escapeHtml(row.carga)}</td>
+      <td>${escapeHtml(row.fornecedor)}</td>
+      <td>${escapeHtml(row.liberacao)}</td>
+      <td>${row.d1}</td>
+      <td>${fmtInt(row.volume)}</td>
+      <td>${row.sku}</td>
+      <td>${canDistribuir ? `<button class="btn btn-ok btn-sm" onclick="distribuirCarga(${row._idx})">Distribuir</button>` : '<span class="tag">aguardando</span>'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('st-fila-count').textContent = fila.length;
+}
+
+function distribuirCarga(idx){
+  const row = pisoData[idx];
+  distData.push({
+    etiquetagem: row.produtivo,
+    doca: row.doca,
+    carga: row.carga,
+    descricao: row.fornecedor,
+    liberacao: row.liberacao,
+    d1: row.d1,
+    volume: row.volume,
+    sku: row.sku,
+    horaDist: nowTime()
+  });
+  pisoData.splice(idx,1);
+  renderAll();
+}
+
+/* ===================== RENDER: PAINEL 3 - DISTRIBUIÇÃO T2 ===================== */
+function renderDist(){
+  const { role } = currentUser;
+  const canEditHora = role === 'admin' || role === 'encarregado' || role === 'conferente';
+  const canEditManual = role !== 'geral'; // qualquer perfil, menos quem entra com a senha geral
+  const canDelete = role === 'admin';
+
+  const tbody = document.getElementById('tbody-dist');
+  tbody.innerHTML = '';
+
+  if(distData.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10">Nenhuma carga distribuída ainda.</td></tr>';
+  }
+
+  distData.forEach((row,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.etiquetagem)}</td>
+      <td>${escapeHtml(row.doca)}</td>
+      <td>${escapeHtml(row.carga)}</td>
+      <td>${escapeHtml(row.descricao)}</td>
+      <td>${escapeHtml(row.liberacao)}</td>
+      <td>${row.d1}</td>
+      <td>${fmtInt(row.volume)}</td>
+      <td>${row.sku}</td>
+      <td><input type="text" value="${escapeHtml(row.horaDist)}" style="width:70px" ${canEditHora?'':'disabled'} onchange="updateDist(${i},'horaDist',this.value)"></td>
+      <td>${canDelete ? `<button class="btn btn-danger" onclick="removeDistRow(${i})">Remover</button>` : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const volTotal = distData.reduce((s,r)=>s+Number(r.volume||0),0);
+  const skuTotal = distData.reduce((s,r)=>s+Number(r.sku||0),0);
+  const qtdProdutivos = Number(distExtras.qtdProdutivos||0);
+  const hh = qtdProdutivos > 0 ? (volTotal / (7*qtdProdutivos)).toFixed(1) : '—';
+
+  document.getElementById('ft-dist-vol').textContent = fmtInt(volTotal);
+  document.getElementById('ft-dist-sku').textContent = skuTotal;
+  document.getElementById('sm-cargas').textContent = distData.length;
+  document.getElementById('sm-hh').textContent = hh;
+
+  const inpProdutivos = document.getElementById('sm-produtivos');
+  const inpFull = document.getElementById('sm-full');
+  const inpMix = document.getElementById('sm-mix');
+  inpProdutivos.value = distExtras.qtdProdutivos;
+  inpFull.value = distExtras.estocadoFull;
+  inpMix.value = distExtras.estocadoMix;
+  [inpProdutivos, inpFull, inpMix].forEach(inp => inp.disabled = !canEditManual);
+
+  const d = new Date();
+  document.getElementById('data-dist').textContent = `${todayLabel().curto} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function updateExtra(field, value){
+  distExtras[field] = Number(value) || 0;
+  renderDist();
+}
+
+function updateDist(i, field, value){
+  distData[i][field] = value;
+  renderDist();
+}
+function removeDistRow(i){
+  if(!confirm('Remover esta carga do painel de distribuição?')) return;
+  distData.splice(i,1);
+  renderDist();
+}
+
+/* ===================== IMPORTAR PLANILHA (colar do Excel) ===================== */
+function openImportModal(){
+  if(currentUser.role !== 'admin') return;
+  document.getElementById('import-textarea').value = '';
+  document.getElementById('import-modal').classList.add('open');
+}
+function closeImportModal(){
+  document.getElementById('import-modal').classList.remove('open');
+}
+
+function toNumberBR(v){
+  if(v === undefined || v === null) return 0;
+  const clean = String(v).trim().replace(/\./g,'').replace(',', '.');
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+}
+const isStatusToken = t => /ETIQUETADA|PENDENTE/i.test(t);
+const isDateToken = t => /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(t);
+const isCargaToken = t => /^\d{4,7}$/.test(t);   // números de carga: 4 a 7 dígitos (ex: 446856)
+const isPureDigits = t => /^\d+$/.test(t);
+
+/*
+  Em vez de assumir que a linha sempre tem exatamente 11 colunas na ordem fixa,
+  a gente localiza colunas "âncora" pelo formato do próprio valor (Status, Data e
+  Carga têm formatos reconhecíveis) e preenche o resto ao redor delas. Assim, se
+  Produtivo, Doca, Departamento ou Obs. vierem em branco (sem gerar uma coluna),
+  o resto da linha continua caindo no lugar certo — em vez de "puxar pra esquerda".
+*/
+function parsePisoRow(raw){
+  const statusIdx = raw.findIndex(isStatusToken);
+  if(statusIdx === -1) return null; // provavelmente é a linha de cabeçalho ou uma linha inválida
+
+  const status = raw[statusIdx].toUpperCase().includes('PENDENTE') ? 'PENDENTE DE ETIQUETAGEM' : 'CARGA ETIQUETADA';
+  const obs = raw.slice(statusIdx+1).join(' ').trim();
+
+  const before = raw.slice(0, statusIdx);
+  const dateIdx = before.findIndex(isDateToken);
+
+  let produtivo='', doca='', carga='', fornecedor='', liberacao='', d1=0, volume=0, sku=0, departamento='';
+
+  if(dateIdx !== -1){
+    liberacao = before[dateIdx];
+
+    // depois da data: D-1, Volume, SKU, Departamento (Departamento é o mais comum de faltar)
+    const afterDate = before.slice(dateIdx+1).filter((_,i,arr)=>true);
+    if(afterDate.length >= 3){
+      d1 = toNumberBR(afterDate[0]);
+      volume = toNumberBR(afterDate[1]);
+      sku = toNumberBR(afterDate[2]);
+      departamento = afterDate.slice(3).join(' ').trim();
+    } else if(afterDate.length === 2){
+      volume = toNumberBR(afterDate[0]);
+      sku = toNumberBR(afterDate[1]);
+    } else if(afterDate.length === 1){
+      volume = toNumberBR(afterDate[0]);
+    }
+
+    // antes da data: Produtivo, Doca, Carga, Fornecedor
+    const beforeDate = before.slice(0, dateIdx);
+    let cargaIdx = beforeDate.findIndex(isCargaToken);
+    if(cargaIdx === -1) cargaIdx = Math.max(0, beforeDate.length - 2);
+    carga = beforeDate[cargaIdx] || '';
+    fornecedor = beforeDate.slice(cargaIdx+1).join(' ').trim();
+
+    const pre = beforeDate.slice(0, cargaIdx); // candidatos a Produtivo / Doca
+    if(pre.length === 1){
+      if(isPureDigits(pre[0])){ doca = pre[0]; } else { produtivo = pre[0]; }
+    } else if(pre.length >= 2){
+      produtivo = pre.slice(0, -1).join(' ');
+      doca = pre[pre.length-1];
+    }
+  } else {
+    // sem data reconhecível: melhor esforço, mantém ordem fixa
+    carga = before[2] || '';
+    fornecedor = before[3] || '';
+  }
+
+  return { produtivo, doca, carga, fornecedor, liberacao, d1, volume, sku, departamento, status, obs };
+}
+
+function importPisoFromPaste(){
+  const raw = document.getElementById('import-textarea').value.trim();
+  if(!raw){ closeImportModal(); return; }
+
+  const lines = raw.split(/\r?\n/).filter(l => l.trim() !== '');
+  const parsed = [];
+
+  lines.forEach(line => {
+    const cols = line.split('\t').map(c => c.trim());
+    if((cols[0]||'').toUpperCase() === 'PRODUTIVO') return; // ignora linha de cabeçalho
+    const row = parsePisoRow(cols);
+    if(row && row.carga) parsed.push(row);
+  });
+
+  if(parsed.length === 0){
+    alert('Não encontrei nenhuma linha válida para importar. Confira se colou as colunas do Excel (com TAB entre elas) e se a coluna Status contém "CARGA ETIQUETADA" ou "PENDENTE DE ETIQUETAGEM".');
+    return;
+  }
+
+  pisoData = parsed;
+  closeImportModal();
+  renderAll();
+}
+
+/* ===================== UTIL ===================== */
+function escapeHtml(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderAll(){
+  renderPiso();
+  renderFila();
+  renderDist();
+}
+
+/* relógio do painel de distribuição */
+setInterval(()=>{ if(currentUser) renderDistClockOnly(); }, 1000*30);
+function renderDistClockOnly(){
+  const d = new Date();
+  const el = document.getElementById('data-dist');
+  if(el) el.textContent = `${todayLabel().curto} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+</script>
+</body>
+</html>
