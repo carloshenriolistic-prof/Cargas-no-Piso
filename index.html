@@ -204,6 +204,33 @@
   }
   .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:14px;}
 
+  .status-ativo{background:var(--ok-bg); color:var(--ok-text);}
+  .status-expulso{background:var(--warn-bg); color:var(--warn-text);}
+  .status-banido{background:#4a1f1f; color:var(--danger);}
+
+  #toast-layer{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    z-index:500; display:flex; flex-direction:column; gap:10px; align-items:center;
+    pointer-events:none; width:100%; max-width:480px; padding:0 12px;
+  }
+  .toast{
+    pointer-events:auto;
+    width:100%;
+    border-radius:6px;
+    padding:14px 18px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:.95rem;
+    color:#1a1200;
+    background:linear-gradient(135deg,#ffd76a,#ff9d3c);
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+    animation: toast-in .35s ease, toast-pulse 1s ease-in-out 2, toast-out .4s ease 4.6s forwards;
+  }
+  .toast.error{ background:linear-gradient(135deg,#ff8a80,#e2685f); }
+  @keyframes toast-in{ from{ transform:translateY(-30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  @keyframes toast-out{ to{ transform:translateY(-20px); opacity:0; } }
+  @keyframes toast-pulse{ 0%,100%{ box-shadow:0 10px 30px rgba(0,0,0,.35); } 50%{ box-shadow:0 10px 46px rgba(255,157,60,.85); } }
+
   @media (max-width:720px){
     main{padding:16px;}
     .panel-header{flex-direction:column; align-items:flex-start;}
@@ -212,6 +239,8 @@
 </style>
 </head>
 <body>
+<div id="toast-layer"></div>
+
 
 <!-- ===================== LOGIN ===================== -->
 <div id="login-screen">
@@ -228,6 +257,14 @@
       <div class="field">
         <label for="in-senha">Senha</label>
         <input id="in-senha" type="password" placeholder="Senha de acesso" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="in-celular">Tipo de celular</label>
+        <select id="in-celular">
+          <option value="Android">Android</option>
+          <option value="iPhone">iPhone</option>
+          <option value="Computador">Computador (sem celular)</option>
+        </select>
       </div>
       <div id="login-error"></div>
       <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
@@ -247,12 +284,31 @@
       </div>
     </div>
     <div class="actions">
+      <span class="tag" id="sync-status">Nuvem: conectando…</span>
       <button class="btn btn-ghost btn-sm" id="demo-btn" onclick="loadDemo()" style="display:none;">Carregar exemplo</button>
       <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
     </div>
   </div>
 
   <main>
+
+    <!-- PANEL 0: CONTROLE DE USUÁRIOS (só admin) -->
+    <section class="panel" id="panel-usuarios" style="display:none;">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2>USUÁRIOS</h2>
+          <span class="sub">Quem já acessou o painel</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Nome</th><th>Função</th><th>Celular</th><th>Status</th><th>Último acesso</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-usuarios"></tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- PANEL 1: CARGAS NO PISO -->
     <section class="panel" id="panel-piso">
@@ -422,18 +478,41 @@ const DEMO_DIST = [
 ];
 const DEMO_EXTRAS = { qtdProdutivos: 7, estocadoFull: 175, estocadoMix: 8588 };
 
+/* Essas funções são sobrescritas pelo módulo do Firebase, lá embaixo, assim
+   que ele carrega. Se o Firebase não carregar por algum motivo, elas caem
+   nesse comportamento padrão (permissivo) e o painel continua funcionando
+   só na memória do navegador, sem controle de usuários nem sincronia. */
+function savePiso(){}
+function saveDist(){}
+async function checkAndRegisterUser(nome, celular, role){ return { ok:true }; }
+function watchOwnUserStatus(){}
+function slugifyName(nome){
+  return nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
 /* ===================== LOGIN / LOGOUT ===================== */
-function doLogin(){
+async function doLogin(){
   const nome = document.getElementById('in-nome').value.trim();
   const senha = document.getElementById('in-senha').value;
+  const celular = document.getElementById('in-celular').value;
   const errBox = document.getElementById('login-error');
 
   if(!nome){ errBox.textContent = 'Digite seu nome.'; return; }
   const role = ROLE_PASSWORDS[senha];
   if(!role){ errBox.textContent = 'Senha inválida.'; return; }
 
+  errBox.textContent = 'Verificando acesso…';
+  const check = await checkAndRegisterUser(nome, celular, role);
+  if(!check.ok){
+    errBox.textContent = check.motivo || 'Acesso bloqueado.';
+    return;
+  }
   errBox.textContent = '';
-  currentUser = { nome, role };
+  currentUser = { nome, role, celular, id: slugifyName(nome) };
+
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission();
+  }
 
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -444,16 +523,23 @@ function doLogin(){
   document.getElementById('titulo-dist').setAttribute('contenteditable', role==='admin' ? 'true' : 'false');
   document.getElementById('piso-actions').style.display = role==='admin' ? 'flex' : 'none';
   document.getElementById('demo-btn').style.display = role==='admin' ? 'inline-block' : 'none';
+  document.getElementById('panel-usuarios').style.display = role==='admin' ? 'block' : 'none';
 
   applySectorVisibility();
   renderAll();
+  watchOwnUserStatus(forceLogout);
 }
 
-function logout(){
+function forceLogout(motivo){
   currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('in-senha').value = '';
+  document.getElementById('login-error').textContent = motivo || 'Sua sessão foi encerrada.';
+}
+
+function logout(){
+  forceLogout('');
 }
 
 function applySectorVisibility(){
@@ -468,6 +554,7 @@ function loadDemo(){
   if(currentUser.role !== 'admin') return;
   distData = JSON.parse(JSON.stringify(DEMO_DIST));
   distExtras = { ...DEMO_EXTRAS };
+  saveDist();
   renderDist();
 }
 
@@ -544,15 +631,18 @@ function renderPiso(){
 
 function updatePiso(i, field, value){
   pisoData[i][field] = value;
+  savePiso();
   renderAll();
 }
 function removePisoRow(i){
   if(!confirm('Remover esta carga do piso?')) return;
   pisoData.splice(i,1);
+  savePiso();
   renderAll();
 }
 function addPisoRow(){
   pisoData.push({produtivo:'', doca:'', carga:'', fornecedor:'', liberacao: todayLabel().curto, d1:0, volume:0, sku:0, departamento:'', status:'PENDENTE DE ETIQUETAGEM', obs:''});
+  savePiso();
   renderAll();
 }
 
@@ -598,9 +688,12 @@ function distribuirCarga(idx){
     d1: row.d1,
     volume: row.volume,
     sku: row.sku,
-    horaDist: nowTime()
+    horaDist: nowTime(),
+    distribuidoPor: currentUser.nome
   });
   pisoData.splice(idx,1);
+  savePiso();
+  saveDist();
   renderAll();
 }
 
@@ -629,7 +722,7 @@ function renderDist(){
       <td>${row.d1}</td>
       <td>${fmtInt(row.volume)}</td>
       <td>${row.sku}</td>
-      <td><input type="text" value="${escapeHtml(row.horaDist)}" style="width:70px" ${canEditHora?'':'disabled'} onchange="updateDist(${i},'horaDist',this.value)"></td>
+      <td><input type="text" value="${escapeHtml(row.horaDist)}" title="${row.distribuidoPor ? 'Distribuído por '+escapeHtml(row.distribuidoPor) : ''}" style="width:70px" ${canEditHora?'':'disabled'} onchange="updateDist(${i},'horaDist',this.value)"></td>
       <td>${canDelete ? `<button class="btn btn-danger" onclick="removeDistRow(${i})">Remover</button>` : ''}</td>
     `;
     tbody.appendChild(tr);
@@ -659,16 +752,19 @@ function renderDist(){
 
 function updateExtra(field, value){
   distExtras[field] = Number(value) || 0;
+  saveDist();
   renderDist();
 }
 
 function updateDist(i, field, value){
   distData[i][field] = value;
+  saveDist();
   renderDist();
 }
 function removeDistRow(i){
   if(!confirm('Remover esta carga do painel de distribuição?')) return;
   distData.splice(i,1);
+  saveDist();
   renderDist();
 }
 
@@ -772,6 +868,7 @@ function importPisoFromPaste(){
   }
 
   pisoData = parsed;
+  savePiso();
   closeImportModal();
   renderAll();
 }
@@ -782,10 +879,87 @@ function escapeHtml(str){
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ===================== NOTIFICAÇÕES VIBRANTES ===================== */
+function showToast(message, isError){
+  const layer = document.getElementById('toast-layer');
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = message;
+  layer.appendChild(el);
+  setTimeout(()=> el.remove(), 5200);
+}
+
+function playBeep(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'square';
+    o.frequency.value = 880;
+    g.gain.value = 0.12;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.setValueAtTime(1180, ctx.currentTime + 0.12);
+    o.stop(ctx.currentTime + 0.28);
+    setTimeout(()=>ctx.close(), 500);
+  } catch(e){ /* navegador sem suporte a áudio, ignora */ }
+}
+
+function notifyDistribuicao(row){
+  const msg = `🚚 Carga ${row.carga} (${row.descricao || ''}) distribuída por ${row.distribuidoPor || 'alguém'}!`;
+  showToast(msg, false);
+  playBeep();
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification('CARGAS NO PISO', { body: msg }); } catch(e){}
+  }
+}
+
+/* ===================== PAINEL DE USUÁRIOS (admin) ===================== */
+let usuariosData = []; // preenchido pelo módulo do Firebase (coleção "usuarios")
+
+function renderUsuarios(){
+  if(!currentUser || currentUser.role !== 'admin') return;
+  const tbody = document.getElementById('tbody-usuarios');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+
+  if(usuariosData.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhum usuário registrado ainda.</td></tr>';
+    return;
+  }
+
+  usuariosData.forEach(u => {
+    const statusClass = u.status === 'banido' ? 'status-banido' : (u.status === 'expulso' ? 'status-expulso' : 'status-ativo');
+    const statusLabel = u.status === 'banido' ? 'Banido' : (u.status === 'expulso' ? 'Expulso' : 'Ativo');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(u.nome)}</td>
+      <td>${escapeHtml(ROLE_LABELS[u.role] || u.role)}</td>
+      <td>${escapeHtml(u.celular)}</td>
+      <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
+      <td>${escapeHtml(u.ultimoAcesso || '')}</td>
+      <td>
+        ${u.status !== 'banido' ? `
+          <button class="btn btn-ghost btn-sm" onclick="kickUser('${u.id}')">Expulsar</button>
+          <button class="btn btn-danger" onclick="banUser('${u.id}')">Banir</button>
+        ` : '<span class="hint" style="margin:0;">sem volta</span>'}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// sobrescritas pelo módulo do Firebase
+function banUser(id){ console.warn('Firebase não carregou ainda.'); }
+function kickUser(id){ console.warn('Firebase não carregou ainda.'); }
+
 function renderAll(){
   renderPiso();
   renderFila();
   renderDist();
+  renderUsuarios();
 }
 
 /* relógio do painel de distribuição */
@@ -795,6 +969,152 @@ function renderDistClockOnly(){
   const el = document.getElementById('data-dist');
   if(el) el.textContent = `${todayLabel().curto} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
+</script>
+
+<!-- ===================== FIREBASE (Firestore) ===================== -->
+<!-- Guarda os dados na nuvem, no projeto "cargas-no-piso", pra todo mundo
+     ver os mesmos painéis e os dados sobreviverem a um F5 ou a fechar a aba.
+     Usei a versão via CDN (sem npm/instalação), já que o site é servido
+     direto pelo GitHub Pages, sem etapa de build. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getFirestore, doc, setDoc, getDoc, onSnapshot,
+    collection, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAcx-nKlkdq3e8xyKjNbMD224OHwPhDKXc",
+    authDomain: "cargas-no-piso.firebaseapp.com",
+    projectId: "cargas-no-piso",
+    storageBucket: "cargas-no-piso.firebasestorage.app",
+    messagingSenderId: "938340323077",
+    appId: "1:938340323077:web:8b18a6ea9240143d28316c"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const pisoRef = doc(db, 'painelCD', 'piso');
+  const distRef = doc(db, 'painelCD', 'distribuicao');
+  const usuariosCol = collection(db, 'usuarios');
+
+  function setSyncStatus(text, isError){
+    const el = document.getElementById('sync-status');
+    if(!el) return;
+    el.textContent = 'Nuvem: ' + text;
+    el.style.color = isError ? '#e2685f' : '';
+    el.style.borderColor = isError ? '#e2685f' : '';
+  }
+  function reportError(prefixo, err){
+    console.error(prefixo, err);
+    setSyncStatus('erro (ver aviso)', true);
+    if(typeof showToast === 'function'){
+      showToast('⚠️ ' + prefixo + ' ' + (err && err.message ? err.message : err), true);
+    }
+  }
+
+  // ---------- salvar cargas / distribuição ----------
+  window.savePiso = function(){
+    setDoc(pisoRef, { rows: pisoData }).catch(err => reportError('Erro ao salvar cargas no piso:', err));
+  };
+  window.saveDist = function(){
+    setDoc(distRef, { rows: distData, extras: distExtras }).catch(err => reportError('Erro ao salvar distribuição:', err));
+  };
+
+  let pisoReady = false, distReady = false;
+  function markReady(){
+    if(pisoReady && distReady) setSyncStatus('conectado, em tempo real', false);
+  }
+
+  onSnapshot(pisoRef, snap => {
+    if(snap.exists()){
+      pisoData = snap.data().rows || [];
+    } else {
+      savePiso();
+    }
+    pisoReady = true; markReady();
+    if(currentUser) renderAll();
+  }, err => reportError('Erro ao ler cargas no piso:', err));
+
+  // controla a notificação vibrante: só avisa sobre cargas novas, nunca no primeiro carregamento
+  let distConhecidas = null;
+  onSnapshot(distRef, snap => {
+    if(snap.exists()){
+      const d = snap.data();
+      const novasRows = d.rows || [];
+
+      if(distConhecidas === null){
+        // primeiro carregamento: só memoriza, não notifica nada
+        distConhecidas = new Set(novasRows.map(r => r.carga + '|' + r.horaDist));
+      } else {
+        novasRows.forEach(r => {
+          const chave = r.carga + '|' + r.horaDist;
+          if(!distConhecidas.has(chave)){
+            distConhecidas.add(chave);
+            if(typeof notifyDistribuicao === 'function') notifyDistribuicao(r);
+          }
+        });
+      }
+
+      distData = novasRows;
+      distExtras = d.extras || distExtras;
+    } else {
+      saveDist();
+    }
+    distReady = true; markReady();
+    if(currentUser) renderAll();
+  }, err => reportError('Erro ao ler distribuição:', err));
+
+  // ---------- controle de usuários ----------
+  window.checkAndRegisterUser = async function(nome, celular, role){
+    const id = slugifyName(nome);
+    const ref = doc(usuariosCol, id);
+    try{
+      const snap = await getDoc(ref);
+      if(snap.exists() && snap.data().status === 'banido'){
+        return { ok:false, motivo:'Você foi banido deste painel pelo administrador.' };
+      }
+      await setDoc(ref, {
+        nome, celular, role,
+        status: 'ativo',
+        ultimoAcesso: new Date().toLocaleString('pt-BR')
+      }, { merge:true });
+      return { ok:true };
+    } catch(err){
+      reportError('Erro ao verificar usuário:', err);
+      return { ok:true }; // se o Firestore falhar, não trava o acesso — só fica sem controle de usuários
+    }
+  };
+
+  window.watchOwnUserStatus = function(onBlocked){
+    if(!currentUser) return;
+    const ref = doc(usuariosCol, currentUser.id);
+    onSnapshot(ref, snap => {
+      if(!snap.exists()) return;
+      const status = snap.data().status;
+      if(status === 'banido'){
+        onBlocked('Você foi banido deste painel pelo administrador.');
+      } else if(status === 'expulso'){
+        onBlocked('Você foi removido do grupo. Pode entrar novamente quando quiser.');
+      }
+    });
+  };
+
+  onSnapshot(usuariosCol, snap => {
+    usuariosData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if(currentUser && currentUser.role === 'admin') renderUsuarios();
+  }, err => reportError('Erro ao ler usuários:', err));
+
+  window.banUser = function(id){
+    if(!confirm('Banir esse usuário PERMANENTEMENTE? Ele nunca mais vai conseguir entrar, e não tem como desfazer.')) return;
+    setDoc(doc(usuariosCol, id), { status:'banido' }, { merge:true })
+      .catch(err => reportError('Erro ao banir usuário:', err));
+  };
+  window.kickUser = function(id){
+    setDoc(doc(usuariosCol, id), { status:'expulso' }, { merge:true })
+      .catch(err => reportError('Erro ao expulsar usuário:', err));
+  };
 </script>
 </body>
 </html>
