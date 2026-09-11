@@ -645,7 +645,18 @@ function renderPiso(){
   document.getElementById('data-piso').textContent = `${curto} · ${extenso}`;
 }
 
+function cargaJaDistribuida(cargaNum){
+  const alvo = String(cargaNum).trim();
+  if(!alvo) return false;
+  return distData.some(r => String(r.carga).trim() === alvo);
+}
+
 function updatePiso(i, field, value){
+  if(field === 'carga' && cargaJaDistribuida(value)){
+    showToast(`⚠️ A carga ${value} já está na Distribuição T2 — não foi adicionada ao piso.`, true);
+    renderAll(); // reverte o campo pro valor anterior
+    return;
+  }
   pisoData[i][field] = value;
   savePiso();
   renderAll();
@@ -928,7 +939,15 @@ function importPisoFromPaste(){
     return;
   }
 
-  pisoData = parsed;
+  const bloqueadas = parsed.filter(r => cargaJaDistribuida(r.carga));
+  const liberadas = parsed.filter(r => !cargaJaDistribuida(r.carga));
+
+  if(bloqueadas.length > 0){
+    const lista = bloqueadas.map(r => r.carga).join(', ');
+    showToast(`⚠️ ${bloqueadas.length} carga(s) já estavam na Distribuição T2 e não foram adicionadas: ${lista}`, true);
+  }
+
+  pisoData = liberadas;
   savePiso();
   closeImportModal();
   renderAll();
