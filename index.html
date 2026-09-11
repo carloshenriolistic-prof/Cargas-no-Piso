@@ -212,6 +212,28 @@
   tbody tr.clickable-row{ cursor:pointer; }
   tbody tr.clickable-row:hover{ background:#2c3542; outline:1px dashed var(--band); outline-offset:-2px; }
 
+  .fila-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr));
+    gap:12px; padding:18px 20px;
+  }
+  .fila-card{
+    background:var(--row-alt); border:1px solid var(--line); border-radius:6px;
+    padding:14px 16px; cursor:pointer; transition:filter .35s ease, opacity .35s ease, border-color .2s ease;
+  }
+  .fila-card:hover{ border-color:var(--band); }
+  .fila-card:active{ transform:scale(.98); }
+  .fila-card.marcando{ filter:grayscale(1); opacity:.45; pointer-events:none; }
+  .fila-card .carga-num{ font-size:.66rem; color:var(--text-dim); letter-spacing:.04em; }
+  .fila-card .fornecedor{
+    font-family:'Oswald',sans-serif; font-weight:600; font-size:.92rem;
+    margin:3px 0 12px; line-height:1.25; min-height:2.4em;
+  }
+  .fila-card .stats{ display:flex; gap:6px; border-top:1px solid var(--line); padding-top:10px; }
+  .fila-card .stat{ flex:1; text-align:center; }
+  .fila-card .stat .n{ font-family:'Oswald',sans-serif; font-size:1rem; font-weight:600; color:var(--band); }
+  .fila-card .stat .l{ font-size:.58rem; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dim); margin-top:1px; }
+  .fila-empty{ grid-column:1/-1; text-align:center; color:var(--text-dim); padding:22px; font-style:italic; }
+
   #toast-layer{
     position:fixed; top:16px; left:50%; transform:translateX(-50%);
     z-index:500; display:flex; flex-direction:column; gap:10px; align-items:center;
@@ -364,17 +386,7 @@
           <div class="stat"><div class="n" id="st-fila-count">0</div><div class="l">Aguardando</div></div>
         </div>
       </div>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Produtivo</th><th>Doca</th><th>Carga</th><th>Fornecedor</th><th>Liberação</th>
-              <th>D-1</th><th>Volume</th><th>SKU</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="tbody-fila"></tbody>
-        </table>
-      </div>
+      <div class="fila-grid" id="fila-grid"></div>
     </section>
 
     <!-- PANEL 3: DISTRIBUIÇÃO T2 -->
@@ -653,37 +665,41 @@ function addPisoRow(){
 /* ===================== RENDER: PAINEL 2 - FILA DE DISTRIBUIÇÃO ===================== */
 function renderFila(){
   const canDistribuir = ['admin','encarregado','conferente'].includes(currentUser.role);
-  const tbody = document.getElementById('tbody-fila');
-  tbody.innerHTML = '';
+  const grid = document.getElementById('fila-grid');
+  grid.innerHTML = '';
 
   const fila = pisoData.map((r,i)=>({...r, _idx:i})).filter(r => r.status === 'CARGA ETIQUETADA');
 
   if(fila.length === 0){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Nenhuma carga aguardando distribuição.</td></tr>';
+    grid.innerHTML = '<div class="fila-empty">Nenhuma carga aguardando distribuição.</div>';
   }
 
   fila.forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${escapeHtml(row.produtivo)}</td>
-      <td>${escapeHtml(row.doca)}</td>
-      <td>${escapeHtml(row.carga)}</td>
-      <td>${escapeHtml(row.fornecedor)}</td>
-      <td>${escapeHtml(row.liberacao)}</td>
-      <td>${row.d1}</td>
-      <td>${fmtInt(row.volume)}</td>
-      <td>${row.sku}</td>
-      <td>${canDistribuir ? `<button class="btn btn-ok btn-sm" onclick="marcarDistribuido(this, ${row._idx})">Distribuir</button>` : '<span class="tag">aguardando</span>'}</td>
+    const card = document.createElement('div');
+    card.className = 'fila-card';
+    card.title = canDistribuir ? 'Clique pra marcar como distribuída' : '';
+    card.innerHTML = `
+      <div class="carga-num">Carga ${escapeHtml(row.carga)}${row.doca ? ' · Doca '+escapeHtml(row.doca) : ''}</div>
+      <div class="fornecedor">${escapeHtml(row.fornecedor)}</div>
+      <div class="stats">
+        <div class="stat"><div class="n">${fmtInt(row.volume)}</div><div class="l">Volume</div></div>
+        <div class="stat"><div class="n">${row.sku}</div><div class="l">SKU</div></div>
+        <div class="stat"><div class="n">${row.d1}</div><div class="l">Aging</div></div>
+      </div>
     `;
-    tbody.appendChild(tr);
+    if(canDistribuir){
+      card.onclick = () => marcarDistribuido(card, row._idx);
+    } else {
+      card.style.cursor = 'default';
+    }
+    grid.appendChild(card);
   });
 
   document.getElementById('st-fila-count').textContent = fila.length;
 }
 
-function marcarDistribuido(btn, idx){
-  const tr = btn.closest('tr');
-  if(tr) tr.classList.add('marcando'); // fica transparente, sinalizando que foi marcada
+function marcarDistribuido(cardEl, idx){
+  cardEl.classList.add('marcando'); // fica cinza, sinalizando que foi marcada
   setTimeout(()=> distribuirCarga(idx), 350);
 }
 
@@ -740,7 +756,7 @@ function renderDist(){
   const canEditHora = role === 'admin' || role === 'encarregado' || role === 'conferente';
   const canEditManual = role !== 'geral'; // qualquer perfil, menos quem entra com a senha geral
   const canDevolver = role === 'admin' || role === 'encarregado' || role === 'conferente';
-  const canDelete = role === 'admin';
+  const canDelete = role === 'admin' || role === 'encarregado' || role === 'conferente';
 
   const tbody = document.getElementById('tbody-dist');
   tbody.innerHTML = '';
