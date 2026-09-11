@@ -208,6 +208,10 @@
   .status-expulso{background:var(--warn-bg); color:var(--warn-text);}
   .status-banido{background:#4a1f1f; color:var(--danger);}
 
+  tbody tr.marcando{ opacity:.2; transition:opacity .35s ease; pointer-events:none; }
+  tbody tr.clickable-row{ cursor:pointer; }
+  tbody tr.clickable-row:hover{ background:#2c3542; outline:1px dashed var(--band); outline-offset:-2px; }
+
   #toast-layer{
     position:fixed; top:16px; left:50%; transform:translateX(-50%);
     z-index:500; display:flex; flex-direction:column; gap:10px; align-items:center;
@@ -669,12 +673,18 @@ function renderFila(){
       <td>${row.d1}</td>
       <td>${fmtInt(row.volume)}</td>
       <td>${row.sku}</td>
-      <td>${canDistribuir ? `<button class="btn btn-ok btn-sm" onclick="distribuirCarga(${row._idx})">Distribuir</button>` : '<span class="tag">aguardando</span>'}</td>
+      <td>${canDistribuir ? `<button class="btn btn-ok btn-sm" onclick="marcarDistribuido(this, ${row._idx})">Distribuir</button>` : '<span class="tag">aguardando</span>'}</td>
     `;
     tbody.appendChild(tr);
   });
 
   document.getElementById('st-fila-count').textContent = fila.length;
+}
+
+function marcarDistribuido(btn, idx){
+  const tr = btn.closest('tr');
+  if(tr) tr.classList.add('marcando'); // fica transparente, sinalizando que foi marcada
+  setTimeout(()=> distribuirCarga(idx), 350);
 }
 
 function distribuirCarga(idx){
@@ -697,11 +707,39 @@ function distribuirCarga(idx){
   renderAll();
 }
 
+// clicar na linha da Distribuição T2 devolve a carga pro piso (desfaz a distribuição)
+function devolverAoPiso(i){
+  const row = distData[i];
+  if(!confirm(`Devolver a carga ${row.carga} para "Cargas no piso"?`)) return;
+  pisoData.push({
+    produtivo: row.etiquetagem,
+    doca: row.doca,
+    carga: row.carga,
+    fornecedor: row.descricao,
+    liberacao: row.liberacao,
+    d1: row.d1,
+    volume: row.volume,
+    sku: row.sku,
+    departamento: '',
+    status: 'CARGA ETIQUETADA',
+    obs: ''
+  });
+  distData.splice(i,1);
+  savePiso();
+  saveDist();
+  renderAll();
+}
+function handleDistRowClick(ev, i){
+  if(ev.target.closest('input') || ev.target.closest('button') || ev.target.closest('select')) return;
+  devolverAoPiso(i);
+}
+
 /* ===================== RENDER: PAINEL 3 - DISTRIBUIÇÃO T2 ===================== */
 function renderDist(){
   const { role } = currentUser;
   const canEditHora = role === 'admin' || role === 'encarregado' || role === 'conferente';
   const canEditManual = role !== 'geral'; // qualquer perfil, menos quem entra com a senha geral
+  const canDevolver = role === 'admin' || role === 'encarregado' || role === 'conferente';
   const canDelete = role === 'admin';
 
   const tbody = document.getElementById('tbody-dist');
@@ -713,6 +751,11 @@ function renderDist(){
 
   distData.forEach((row,i) => {
     const tr = document.createElement('tr');
+    if(canDevolver){
+      tr.classList.add('clickable-row');
+      tr.title = 'Clique na linha pra devolver essa carga pro piso';
+      tr.onclick = (ev) => handleDistRowClick(ev, i);
+    }
     tr.innerHTML = `
       <td>${escapeHtml(row.etiquetagem)}</td>
       <td>${escapeHtml(row.doca)}</td>
@@ -728,10 +771,12 @@ function renderDist(){
     tbody.appendChild(tr);
   });
 
-  const volTotal = distData.reduce((s,r)=>s+Number(r.volume||0),0);
+  // Full e Mix são valores adicionais, avulsos das linhas — entram somados no total de volume e no H/H
+  const volLinhas = distData.reduce((s,r)=>s+Number(r.volume||0),0);
   const skuTotal = distData.reduce((s,r)=>s+Number(r.sku||0),0);
+  const volTotal = volLinhas + Number(distExtras.estocadoFull||0) + Number(distExtras.estocadoMix||0);
   const qtdProdutivos = Number(distExtras.qtdProdutivos||0);
-  const hh = qtdProdutivos > 0 ? (volTotal / (7*qtdProdutivos)).toFixed(1) : '—';
+  const hh = qtdProdutivos > 0 ? (volTotal / qtdProdutivos / 7).toFixed(1) : '—';
 
   document.getElementById('ft-dist-vol').textContent = fmtInt(volTotal);
   document.getElementById('ft-dist-sku').textContent = skuTotal;
