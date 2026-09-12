@@ -278,6 +278,28 @@
     .panel-header{flex-direction:column; align-items:flex-start;}
     table{font-size:.75rem;}
   }
+
+  /* ---------- ABAS ---------- */
+  .tabnav{
+    display:flex; gap:6px; padding:0 28px; max-width:1400px; margin:0 auto;
+    border-bottom:1px solid var(--line); flex-wrap:wrap;
+  }
+  .tab-btn{
+    cursor:pointer; border:none; background:transparent; color:var(--text-dim);
+    font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.03em;
+    padding:14px 18px 12px; font-size:.85rem; border-bottom:2px solid transparent;
+  }
+  .tab-btn.active{ color:var(--band); border-bottom-color:var(--band); }
+  .tab-btn:hover{ color:var(--text); }
+  @media (max-width:720px){ .tabnav{padding:0 16px;} }
+
+  /* ---------- IMPRESSÃO (relatório Cross) ---------- */
+  @media print{
+    body *{ visibility:hidden; }
+    #panel-relatorio-cross, #panel-relatorio-cross *{ visibility:visible; }
+    #panel-relatorio-cross{ position:absolute; left:0; top:0; width:100%; margin:0; border:none; }
+    .no-print{ display:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -333,7 +355,34 @@
     </div>
   </div>
 
+  <div class="tabnav">
+    <button class="tab-btn active" id="tab-btn-piso" onclick="switchTab('piso')">Cargas no Piso</button>
+    <button class="tab-btn" id="tab-btn-cross" onclick="switchTab('cross')">Pendências Relatório Cross</button>
+  </div>
+
   <main>
+  <div id="tab-piso">
+
+    <!-- PANEL: SOLICITAÇÕES DE ACESSO (só admin) -->
+    <section class="panel" id="panel-solicitacoes" style="display:none;">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2>SOLICITAÇÕES DE ACESSO</h2>
+          <span class="sub">Pedidos de quem foi expulso ou banido e tentou entrar de novo</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="st-solic-count">0</div><div class="l">Pendentes</div></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Nome</th><th>Situação atual</th><th>Função solicitada</th><th>Celular</th><th>Solicitado em</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-solicitacoes"></tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- PANEL 0: CONTROLE DE USUÁRIOS (só admin) -->
     <section class="panel" id="panel-usuarios" style="display:none;">
@@ -451,6 +500,67 @@
       </div>
     </section>
 
+  </div>
+  <!-- fim da aba "Cargas no Piso" -->
+
+  <div id="tab-cross" style="display:none;">
+
+    <!-- PANEL: TABELA DE PENDÊNCIAS DO CROSS -->
+    <section class="panel" id="panel-cross-pendencias">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2>PENDÊNCIAS RELATÓRIO CROSS</h2>
+          <span class="sub">Cargas com % de agrupamento acima de 1% · Caminho: CROSS</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="st-cross-pend-count">0</div><div class="l">Cargas pendentes</div></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Carga</th><th>Fornecedor</th><th>Aging</th><th>Vol. Montado</th><th>Vol. Agrupado</th><th>% Agrupado</th><th>Imprimir?</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cross-pend"></tbody>
+        </table>
+      </div>
+      <div class="panel-footer-actions no-print" id="cross-pend-actions" style="display:none;">
+        <button class="btn btn-ghost btn-sm" onclick="openCrossImportModal()">Colar relatório da planilha (Excel)</button>
+      </div>
+    </section>
+
+    <!-- PANEL: RELATÓRIO MONTADO ACUMULADO (impressão) -->
+    <section class="panel" id="panel-relatorio-cross">
+      <div class="panel-header">
+        <div class="title-block">
+          <h2>RELATÓRIO MONTADO — CROSS</h2>
+          <span class="sub">Itens das cargas marcadas na tabela de pendências</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="n" id="st-cross-rel-count">0</div><div class="l">Itens no relatório</div></div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Master</th><th>Destino</th><th>Cód</th><th>Descrição</th><th>Embl</th><th>Qtd</th><th>Carga</th><th>Fornecedor</th><th>Aging</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-cross-relatorio"></tbody>
+        </table>
+      </div>
+      <div class="panel-footer-actions no-print" style="flex-direction:column; align-items:flex-start; gap:8px;">
+        <button class="btn btn-primary" style="width:auto; display:none;" id="btn-print-cross" onclick="imprimirRelatorioCross()">Imprimir relatório</button>
+        <span class="hint" style="margin:0;">Na janela de impressão, selecione a impressora <b>1030-SUOP-001</b> (porta IP_10.30.2.235).</span>
+      </div>
+    </section>
+
+  </div>
+  <!-- fim da aba "Pendências Relatório Cross" -->
+
   </main>
 </div>
 
@@ -467,6 +577,24 @@
       <div class="modal-actions">
         <button class="btn btn-ghost btn-sm" onclick="closeImportModal()">Cancelar</button>
         <button class="btn btn-primary" style="width:auto;" onclick="importPisoFromPaste()">Importar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: IMPORTAR RELATÓRIO CROSS ===================== -->
+<div class="modal-overlay" id="import-cross-modal">
+  <div class="modal-box">
+    <div class="login-band">
+      <h1>Colar relatório Cross da planilha</h1>
+      <p>Cole as linhas copiadas do Excel (colunas: Agrupadora, Master, Status, Destino, Cód, Descrição, Embl, Qtd, Carga, Fornecedor, Aging, Caminho)</p>
+    </div>
+    <div class="modal-body">
+      <textarea id="import-cross-textarea" placeholder="Cole aqui o intervalo copiado do Excel..."></textarea>
+      <p class="hint">Isso substitui todo o relatório Cross atual pelas linhas coladas e reinicia as marcações de impressão. A tabela de pendências é calculada automaticamente somando o QTD por carga, separando as linhas com status "Montada" das linhas com status "Agrupada".</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-sm" onclick="closeCrossImportModal()">Cancelar</button>
+        <button class="btn btn-primary" style="width:auto;" onclick="importCrossFromPaste()">Importar</button>
       </div>
     </div>
   </div>
@@ -569,6 +697,9 @@ let pisoData = [
 let distData = []; // cargas já distribuídas (painel 3)
 let distExtras = { qtdProdutivos: 0, estocadoFull: 0, estocadoMix: 0 }; // valores manuais, avulsos da grade
 
+let crossRawData = []; // linhas cruas do relatório Cross importado (todas as cargas, status Montada e Agrupada)
+let crossMarcadas = {}; // { carga: true } cargas que o conferente marcou pra entrar no relatório impresso
+
 const DEMO_DIST = [
   {etiquetagem:'', doca:'', carga:'446886', descricao:'VINICOLA ID:8594', liberacao:'10/09/2026', d1:0, volume:2064, sku:9, horaDist:'19:10'},
   {etiquetagem:'', doca:'', carga:'446523', descricao:'RUAH ALIMENTOS ID:8292', liberacao:'10/09/2026', d1:0, volume:2079, sku:18, horaDist:'19:15'},
@@ -586,6 +717,7 @@ const DEMO_EXTRAS = { qtdProdutivos: 7, estocadoFull: 175, estocadoMix: 8588 };
    só na memória do navegador, sem controle de usuários nem sincronia. */
 function savePiso(){}
 function saveDist(){}
+function saveCross(){}
 async function checkAndRegisterUser(nome, celular, role){ return { ok:true }; }
 function watchOwnUserStatus(){}
 function slugifyName(nome){
@@ -626,10 +758,20 @@ async function doLogin(){
   document.getElementById('piso-actions').style.display = role==='admin' ? 'flex' : 'none';
   document.getElementById('demo-btn').style.display = role==='admin' ? 'inline-block' : 'none';
   document.getElementById('panel-usuarios').style.display = role==='admin' ? 'block' : 'none';
+  document.getElementById('panel-solicitacoes').style.display = role==='admin' ? 'block' : 'none';
 
   applySectorVisibility();
+  switchTab('piso');
   renderAll();
   watchOwnUserStatus(forceLogout);
+}
+
+/* ===================== ABAS ===================== */
+function switchTab(name){
+  document.getElementById('tab-piso').style.display = name === 'piso' ? 'block' : 'none';
+  document.getElementById('tab-cross').style.display = name === 'cross' ? 'block' : 'none';
+  document.getElementById('tab-btn-piso').classList.toggle('active', name === 'piso');
+  document.getElementById('tab-btn-cross').classList.toggle('active', name === 'cross');
 }
 
 function forceLogout(motivo){
@@ -1036,6 +1178,199 @@ function importPisoFromPaste(){
   renderAll();
 }
 
+/* ===================== RELATÓRIO CROSS (pendências + impressão) ===================== */
+
+/* mapa de cabeçalhos aceitos na planilha colada -> chave interna do campo.
+   Assim, a ordem das colunas no Excel não precisa ser fixa: a gente lê o
+   cabeçalho da primeira linha colada e casa cada coluna pelo nome dela. */
+const CROSS_HEADER_MAP = {
+  'AGRUPADORA':'agrupadora',
+  'MASTER':'master',
+  'STATUS':'status',
+  'DESTINO':'destino', 'DESETINO':'destino', // "Desetino" é o jeito como aparece na planilha usada hoje
+  'COD':'cod', 'CODIGO':'cod',
+  'DESCRICAO':'descricao',
+  'EMBL':'embl',
+  'QTD':'qtd',
+  'CARGA':'carga',
+  'FORNECEDOR':'fornecedor',
+  'AGING':'aging',
+  'CAMINHO':'caminho'
+};
+function normalizeHeader(h){
+  return String(h||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+/* aceita a planilha colada com ou sem linha de cabeçalho; se tiver cabeçalho,
+   casa as colunas pelo nome (mais seguro que depender da ordem das colunas) */
+function parseCrossPaste(raw){
+  const lines = raw.split(/\r?\n/).filter(l => l.trim() !== '');
+  if(lines.length === 0) return [];
+
+  const headerCols = lines[0].split('\t').map(normalizeHeader);
+  const hasHeader = headerCols.includes('AGRUPADORA') || headerCols.includes('CARGA');
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  const colKeys = hasHeader
+    ? headerCols.map(h => CROSS_HEADER_MAP[h] || null)
+    : ['agrupadora','master','status','destino','cod','descricao','embl','qtd','carga','fornecedor','aging','caminho'];
+
+  const rows = [];
+  dataLines.forEach(line => {
+    const cols = line.split('\t');
+    const obj = {};
+    colKeys.forEach((key, i) => { if(key) obj[key] = (cols[i] || '').trim(); });
+    if(obj.carga){
+      rows.push({
+        agrupadora: obj.agrupadora || '',
+        master: obj.master || '',
+        status: obj.status || '',
+        destino: obj.destino || '',
+        cod: obj.cod || '',
+        descricao: obj.descricao || '',
+        embl: obj.embl || '',
+        qtd: toNumberBR(obj.qtd),
+        carga: obj.carga || '',
+        fornecedor: obj.fornecedor || '',
+        aging: obj.aging || '',
+        caminho: obj.caminho || ''
+      });
+    }
+  });
+  return rows;
+}
+
+/* agrupa as linhas cruas por carga, somando QTD separado por status
+   Montada/Agrupada, e calcula % = agrupado / (montado+agrupado) */
+function computePendenciasCross(){
+  const grupos = {};
+  crossRawData
+    .filter(r => String(r.caminho||'').trim().toUpperCase() === 'CROSS') // só interessa o caminho CROSS
+    .forEach(r => {
+      const key = r.carga;
+      if(!grupos[key]) grupos[key] = { carga:r.carga, fornecedor:r.fornecedor, aging:r.aging, montado:0, agrupado:0 };
+      const st = String(r.status||'').toUpperCase();
+      const qtd = Number(r.qtd) || 0;
+      if(st.includes('MONTAD')) grupos[key].montado += qtd;
+      else if(st.includes('AGRUPAD')) grupos[key].agrupado += qtd;
+    });
+  return Object.values(grupos)
+    .map(g => ({ ...g, pct: (g.montado + g.agrupado) > 0 ? (g.agrupado / (g.montado + g.agrupado) * 100) : 0 }))
+    // só entra quem realmente está pendente: acima de 1% agrupado e ainda não 100% agrupado
+    // (100% agrupado = carga já resolvida, não interessa mais pra essa tabela)
+    .filter(g => g.pct > 1 && g.pct < 100)
+    .sort((a,b) => b.pct - a.pct);
+}
+
+/* itens do relatório impresso: linhas "Montada" das cargas marcadas na tabela de pendências */
+function computeRelatorioCross(){
+  const cargasMarcadas = Object.keys(crossMarcadas).filter(c => crossMarcadas[c]);
+  if(cargasMarcadas.length === 0) return [];
+  return crossRawData.filter(r => cargasMarcadas.includes(r.carga) && String(r.status||'').toUpperCase().includes('MONTAD'));
+}
+
+function toggleCrossMarcada(carga, checked){
+  crossMarcadas[carga] = checked;
+  saveCross();
+  renderCrossAll();
+}
+
+function renderCrossPendencias(){
+  const canMark = ['admin','encarregado','conferente'].includes(currentUser.role);
+  const canImport = currentUser.role === 'admin';
+  document.getElementById('cross-pend-actions').style.display = canImport ? 'flex' : 'none';
+
+  const tbody = document.getElementById('tbody-cross-pend');
+  tbody.innerHTML = '';
+  const pendencias = computePendenciasCross();
+
+  if(pendencias.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Nenhuma carga pendente no relatório Cross.</td></tr>';
+  }
+
+  pendencias.forEach(p => {
+    const marcada = !!crossMarcadas[p.carga];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(p.carga)}</td>
+      <td>${escapeHtml(p.fornecedor)}</td>
+      <td>${escapeHtml(p.aging)}</td>
+      <td>${fmtInt(p.montado)}</td>
+      <td>${fmtInt(p.agrupado)}</td>
+      <td>${p.pct.toFixed(0)}%</td>
+      <td style="text-align:center;"><input type="checkbox" ${marcada?'checked':''} ${canMark?'':'disabled'} onchange="toggleCrossMarcada('${p.carga}', this.checked)"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('st-cross-pend-count').textContent = pendencias.length;
+}
+
+function renderCrossRelatorio(){
+  const canPrint = ['admin','encarregado','conferente'].includes(currentUser.role);
+  const tbody = document.getElementById('tbody-cross-relatorio');
+  tbody.innerHTML = '';
+  const itens = computeRelatorioCross();
+
+  if(itens.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Nenhuma carga marcada para o relatório ainda.</td></tr>';
+  }
+
+  itens.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.master)}</td>
+      <td>${escapeHtml(r.destino)}</td>
+      <td>${escapeHtml(r.cod)}</td>
+      <td>${escapeHtml(r.descricao)}</td>
+      <td>${escapeHtml(r.embl)}</td>
+      <td>${fmtInt(r.qtd)}</td>
+      <td>${escapeHtml(r.carga)}</td>
+      <td>${escapeHtml(r.fornecedor)}</td>
+      <td>${escapeHtml(r.aging)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('st-cross-rel-count').textContent = itens.length;
+  document.getElementById('btn-print-cross').style.display = canPrint ? 'inline-block' : 'none';
+}
+
+function renderCrossAll(){
+  renderCrossPendencias();
+  renderCrossRelatorio();
+}
+
+function imprimirRelatorioCross(){
+  window.print();
+}
+
+/* ===================== IMPORTAR RELATÓRIO CROSS (colar do Excel) ===================== */
+function openCrossImportModal(){
+  if(currentUser.role !== 'admin') return;
+  document.getElementById('import-cross-textarea').value = '';
+  document.getElementById('import-cross-modal').classList.add('open');
+}
+function closeCrossImportModal(){
+  document.getElementById('import-cross-modal').classList.remove('open');
+}
+function importCrossFromPaste(){
+  const raw = document.getElementById('import-cross-textarea').value.trim();
+  if(!raw){ closeCrossImportModal(); return; }
+
+  const rows = parseCrossPaste(raw);
+  if(rows.length === 0){
+    alert('Não encontrei nenhuma linha válida para importar. Confira se colou as colunas do Excel (com TAB entre elas) e se a coluna Carga está preenchida.');
+    return;
+  }
+
+  crossRawData = rows;
+  crossMarcadas = {}; // planilha nova = reinicia as marcações de impressão
+  saveCross();
+  closeCrossImportModal();
+  renderCrossAll();
+}
+
 /* ===================== CÓDIGO (QR) PRO SITE ===================== */
 let qrRendered = false;
 function openQrModal(){
@@ -1108,8 +1443,22 @@ function notifyDistribuicao(row){
   }
 }
 
+/* avisa só o administrador: alguém que foi expulso/banido tentou entrar de novo */
+function notifySolicitacaoAcesso(s){
+  if(!currentUser || currentUser.role !== 'admin') return;
+  const rotulo = s.situacaoAtual === 'banido' ? 'banido' : 'expulso';
+  const msg = `🔔 ${s.nome} (${rotulo}) tentou acessar o painel de novo. Aprovar ou recusar em "Solicitações de acesso".`;
+  showToast(msg, true);
+  playBeep();
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]);
+  if('Notification' in window && Notification.permission === 'granted'){
+    try{ new Notification('Pedido de acesso — CARGAS NO PISO', { body: msg }); } catch(e){}
+  }
+}
+
 /* ===================== PAINEL DE USUÁRIOS (admin) ===================== */
 let usuariosData = []; // preenchido pelo módulo do Firebase (coleção "usuarios")
+let solicitacoesData = []; // pedidos pendentes de quem foi expulso/banido e tentou entrar de novo
 
 function renderUsuarios(){
   if(!currentUser || currentUser.role !== 'admin') return;
@@ -1133,25 +1482,60 @@ function renderUsuarios(){
       <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
       <td>${escapeHtml(u.ultimoAcesso || '')}</td>
       <td>
-        ${u.status !== 'banido' ? `
+        ${u.status === 'ativo' ? `
           <button class="btn btn-ghost btn-sm" onclick="kickUser('${u.id}')">Expulsar</button>
           <button class="btn btn-danger" onclick="banUser('${u.id}')">Banir</button>
-        ` : '<span class="hint" style="margin:0;">sem volta</span>'}
+        ` : '<span class="hint" style="margin:0;">se tentar entrar de novo, vira pedido de acesso</span>'}
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
+function renderSolicitacoes(){
+  if(!currentUser || currentUser.role !== 'admin') return;
+  const tbody = document.getElementById('tbody-solicitacoes');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+
+  if(solicitacoesData.length === 0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhuma solicitação pendente.</td></tr>';
+  }
+
+  solicitacoesData.forEach(s => {
+    const situacaoClass = s.situacaoAtual === 'banido' ? 'status-banido' : 'status-expulso';
+    const situacaoLabel = s.situacaoAtual === 'banido' ? 'Banido' : 'Expulso';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(s.nome)}</td>
+      <td><span class="status-pill ${situacaoClass}">${situacaoLabel}</span></td>
+      <td>${escapeHtml(ROLE_LABELS[s.roleSolicitado] || s.roleSolicitado)}</td>
+      <td>${escapeHtml(s.celular)}</td>
+      <td>${escapeHtml(s.criadoEm || '')}</td>
+      <td>
+        <button class="btn btn-ok btn-sm" onclick="aprovarSolicitacao('${s.id}')">Aprovar</button>
+        <button class="btn btn-danger" onclick="recusarSolicitacao('${s.id}')">Recusar</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('st-solic-count').textContent = solicitacoesData.length;
+}
+
 // sobrescritas pelo módulo do Firebase
 function banUser(id){ console.warn('Firebase não carregou ainda.'); }
 function kickUser(id){ console.warn('Firebase não carregou ainda.'); }
+function aprovarSolicitacao(id){ console.warn('Firebase não carregou ainda.'); }
+function recusarSolicitacao(id){ console.warn('Firebase não carregou ainda.'); }
 
 function renderAll(){
   renderPiso();
   renderFila();
   renderDist();
   renderUsuarios();
+  renderSolicitacoes();
+  renderCrossAll();
 }
 
 /* relógio do painel de distribuição */
@@ -1171,7 +1555,7 @@ function renderDistClockOnly(){
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import {
-    getFirestore, doc, setDoc, getDoc, onSnapshot,
+    getFirestore, doc, setDoc, getDoc, deleteDoc, onSnapshot,
     collection, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -1189,7 +1573,9 @@ function renderDistClockOnly(){
 
   const pisoRef = doc(db, 'painelCD', 'piso');
   const distRef = doc(db, 'painelCD', 'distribuicao');
+  const crossRef = doc(db, 'painelCD', 'cross');
   const usuariosCol = collection(db, 'usuarios');
+  const solicitacoesCol = collection(db, 'solicitacoesAcesso');
 
   function setSyncStatus(text, isError){
     const el = document.getElementById('sync-status');
@@ -1213,10 +1599,13 @@ function renderDistClockOnly(){
   window.saveDist = function(){
     setDoc(distRef, { rows: distData, extras: distExtras }).catch(err => reportError('Erro ao salvar distribuição:', err));
   };
+  window.saveCross = function(){
+    setDoc(crossRef, { rows: crossRawData, marcadas: crossMarcadas }).catch(err => reportError('Erro ao salvar relatório Cross:', err));
+  };
 
-  let pisoReady = false, distReady = false;
+  let pisoReady = false, distReady = false, crossReady = false;
   function markReady(){
-    if(pisoReady && distReady) setSyncStatus('conectado, em tempo real', false);
+    if(pisoReady && distReady && crossReady) setSyncStatus('conectado, em tempo real', false);
   }
 
   onSnapshot(pisoRef, snap => {
@@ -1258,15 +1647,43 @@ function renderDistClockOnly(){
     if(currentUser) renderAll();
   }, err => reportError('Erro ao ler distribuição:', err));
 
+  onSnapshot(crossRef, snap => {
+    if(snap.exists()){
+      const d = snap.data();
+      crossRawData = d.rows || [];
+      crossMarcadas = d.marcadas || {};
+    } else {
+      saveCross();
+    }
+    crossReady = true; markReady();
+    if(currentUser) renderAll();
+  }, err => reportError('Erro ao ler relatório Cross:', err));
+
   // ---------- controle de usuários ----------
   window.checkAndRegisterUser = async function(nome, celular, role){
     const id = slugifyName(nome);
     const ref = doc(usuariosCol, id);
     try{
       const snap = await getDoc(ref);
-      if(snap.exists() && snap.data().status === 'banido'){
-        return { ok:false, motivo:'Você foi banido deste painel pelo administrador.' };
+      const statusAtual = snap.exists() ? snap.data().status : null;
+
+      // expulso ou banido tentando entrar de novo: não libera na hora — abre um
+      // pedido de acesso pro administrador aceitar ou recusar.
+      if(statusAtual === 'banido' || statusAtual === 'expulso'){
+        await setDoc(doc(solicitacoesCol, id), {
+          nome, celular,
+          roleSolicitado: role,
+          situacaoAtual: statusAtual,
+          status: 'pendente',
+          criadoEm: new Date().toLocaleString('pt-BR')
+        }, { merge:true });
+
+        const motivo = statusAtual === 'banido'
+          ? 'Você foi banido deste painel. Foi enviado um pedido de liberação ao administrador — tente entrar novamente em alguns instantes.'
+          : 'Você foi removido do painel. Foi enviado um pedido de liberação ao administrador — tente entrar novamente em alguns instantes.';
+        return { ok:false, motivo };
       }
+
       await setDoc(ref, {
         nome, celular, role,
         status: 'ativo',
@@ -1298,14 +1715,43 @@ function renderDistClockOnly(){
     if(currentUser && currentUser.role === 'admin') renderUsuarios();
   }, err => reportError('Erro ao ler usuários:', err));
 
+  // controla o aviso vibrante: só notifica pedidos NOVOS, nunca no primeiro carregamento
+  let solicitacoesConhecidas = null;
+  onSnapshot(solicitacoesCol, snap => {
+    const pendentes = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.status === 'pendente');
+
+    if(solicitacoesConhecidas === null){
+      solicitacoesConhecidas = new Set(pendentes.map(s => s.id));
+    } else {
+      pendentes.forEach(s => {
+        if(!solicitacoesConhecidas.has(s.id)){
+          solicitacoesConhecidas.add(s.id);
+          if(typeof notifySolicitacaoAcesso === 'function') notifySolicitacaoAcesso(s);
+        }
+      });
+    }
+
+    solicitacoesData = pendentes;
+    if(currentUser && currentUser.role === 'admin') renderSolicitacoes();
+  }, err => reportError('Erro ao ler solicitações de acesso:', err));
+
   window.banUser = function(id){
-    if(!confirm('Banir esse usuário PERMANENTEMENTE? Ele nunca mais vai conseguir entrar, e não tem como desfazer.')) return;
+    if(!confirm('Banir esse usuário? Ele será desconectado agora e, se tentar entrar de novo, você vai receber um pedido de acesso pra aprovar ou recusar.')) return;
     setDoc(doc(usuariosCol, id), { status:'banido' }, { merge:true })
       .catch(err => reportError('Erro ao banir usuário:', err));
   };
   window.kickUser = function(id){
     setDoc(doc(usuariosCol, id), { status:'expulso' }, { merge:true })
       .catch(err => reportError('Erro ao expulsar usuário:', err));
+  };
+  window.aprovarSolicitacao = function(id){
+    setDoc(doc(usuariosCol, id), { status:'ativo' }, { merge:true })
+      .then(() => deleteDoc(doc(solicitacoesCol, id)))
+      .catch(err => reportError('Erro ao aprovar solicitação de acesso:', err));
+  };
+  window.recusarSolicitacao = function(id){
+    deleteDoc(doc(solicitacoesCol, id))
+      .catch(err => reportError('Erro ao recusar solicitação de acesso:', err));
   };
 </script>
 </body>
