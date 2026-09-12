@@ -1269,6 +1269,30 @@ function computeRelatorioCross(){
   return crossRawData.filter(r => cargasMarcadas.includes(r.carga) && String(r.status||'').toUpperCase().includes('MONTAD'));
 }
 
+/* O Firestore recusa documentos acima de 1MB (1.048.576 bytes). Uma planilha
+   Cross colada inteira pode passar disso fácil, então em vez de salvar tudo
+   num documento só, a gente quebra as linhas em pedaços bem menores (bem
+   abaixo do limite, com folga de sobra) e salva cada pedaço num documento
+   separado — ver mais detalhes no módulo do Firebase, lá embaixo. */
+function chunkCrossRows(rows, maxBytes){
+  maxBytes = maxBytes || 300000;
+  const chunks = [];
+  let atual = [];
+  let tamanhoAtual = 2; // aproximação do overhead do array "[]"
+  rows.forEach(row => {
+    const tamanhoLinha = JSON.stringify(row).length + 1;
+    if(atual.length > 0 && (tamanhoAtual + tamanhoLinha) > maxBytes){
+      chunks.push(atual);
+      atual = [];
+      tamanhoAtual = 2;
+    }
+    atual.push(row);
+    tamanhoAtual += tamanhoLinha;
+  });
+  if(atual.length > 0) chunks.push(atual);
+  return chunks;
+}
+
 function toggleCrossMarcada(carga, checked){
   crossMarcadas[carga] = checked;
   saveCross();
@@ -1573,7 +1597,8 @@ function renderDistClockOnly(){
 
   const pisoRef = doc(db, 'painelCD', 'piso');
   const distRef = doc(db, 'painelCD', 'distribuicao');
-  const crossRef = doc(db, 'painelCD', 'cross');
+  const crossRef = doc(db, 'painelCD', 'cross'); // guarda só as marcações + quantos pedaços (chunks) existem
+  const crossChunksCol = collection(db, 'painelCD/cross/chunks'); // guarda as linhas em pedaços, pra não estourar 1MB
   const usuariosCol = collection(db, 'usuarios');
   const solicitacoesCol = collection(db, 'solicitacoesAcesso');
 
@@ -1599,11 +1624,35 @@ function renderDistClockOnly(){
   window.saveDist = function(){
     setDoc(distRef, { rows: distData, extras: distExtras }).catch(err => reportError('Erro ao salvar distribuição:', err));
   };
-  window.saveCross = function(){
-    setDoc(crossRef, { rows: crossRawData, marcadas: crossMarcadas }).catch(err => reportError('Erro ao salvar relatório Cross:', err));
+  // Guarda quantos chunks existiam na última leitura, pra saber se sobrou
+  // algum chunk "velho" pra apagar quando uma importação nova tem menos linhas.
+  let crossNumChunksConhecido = 0;
+
+  window.saveCross = async function(){
+    try{
+      const chunks = chunkCrossRows(crossRawData);
+
+      // salva os chunks da vez (índice 0, 1, 2...)
+      await Promise.all(chunks.map((linhas, i) =>
+        setDoc(doc(crossChunksCol, String(i)), { indice: i, rows: linhas })
+      ));
+
+      // se a importação nova tem menos chunks que a anterior, apaga os que sobraram
+      const apagarDoIndice = chunks.length;
+      const promessasApagar = [];
+      for(let i = apagarDoIndice; i < crossNumChunksConhecido; i++){
+        promessasApagar.push(deleteDoc(doc(crossChunksCol, String(i))).catch(()=>{}));
+      }
+      await Promise.all(promessasApagar);
+
+      crossNumChunksConhecido = chunks.length;
+      await setDoc(crossRef, { marcadas: crossMarcadas, numChunks: chunks.length });
+    } catch(err){
+      reportError('Erro ao salvar relatório Cross:', err);
+    }
   };
 
-  let pisoReady = false, distReady = false, crossReady = false;
+  let pisoReady = false, distReady = false, crossReady = false, crossMetaReady = false, crossChunksReady = false;
   function markReady(){
     if(pisoReady && distReady && crossReady) setSyncStatus('conectado, em tempo real', false);
   }
@@ -1650,14 +1699,39 @@ function renderDistClockOnly(){
   onSnapshot(crossRef, snap => {
     if(snap.exists()){
       const d = snap.data();
-      crossRawData = d.rows || [];
       crossMarcadas = d.marcadas || {};
+      crossNumChunksConhecido = d.numChunks || 0;
     } else {
-      saveCross();
+      crossMarcadas = {};
+      crossNumChunksConhecido = 0;
     }
-    crossReady = true; markReady();
+    crossMetaReady = true;
+    crossReady = crossMetaReady && crossChunksReady;
+    markReady();
     if(currentUser) renderAll();
   }, err => reportError('Erro ao ler relatório Cross:', err));
+
+  // os pedaços (chunks) das linhas do relatório Cross ficam numa subcoleção
+  // à parte, justamente pra nunca esbarrar no limite de 1MB por documento
+  let crossChunksMap = {}; // { "0": [linhas...], "1": [linhas...], ... }
+  onSnapshot(crossChunksCol, snap => {
+    snap.docChanges().forEach(change => {
+      if(change.type === 'removed'){
+        delete crossChunksMap[change.doc.id];
+      } else {
+        crossChunksMap[change.doc.id] = change.doc.data().rows || [];
+      }
+    });
+    // remonta crossRawData juntando os pedaços na ordem certa (0, 1, 2...)
+    crossRawData = Object.keys(crossChunksMap)
+      .sort((a,b) => Number(a) - Number(b))
+      .flatMap(k => crossChunksMap[k]);
+
+    crossChunksReady = true;
+    crossReady = crossMetaReady && crossChunksReady;
+    markReady();
+    if(currentUser) renderAll();
+  }, err => reportError('Erro ao ler os dados do relatório Cross:', err));
 
   // ---------- controle de usuários ----------
   window.checkAndRegisterUser = async function(nome, celular, role){
